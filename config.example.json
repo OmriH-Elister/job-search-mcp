@@ -1,0 +1,87 @@
+{
+  "candidate": {
+    "name": "Jane Applicant",
+    "email": "jane.applicant@example.com",
+    "phone": "+1-555-0100",
+    "location": "Springfield",
+    "linkedin": "https://linkedin.com/in/jane-applicant",
+    "github": "https://github.com/jane-applicant",
+    "blog": "https://example.com"
+  },
+  "geography": {
+    "base": "Springfield",
+    "max_drive_minutes": 30,
+    "search_areas": [
+      "Springfield",
+      "Shelbyville",
+      "Capital City"
+    ]
+  },
+  "target_roles": [
+    {
+      "title": "Security Automation Engineer",
+      "keywords": [
+        "security automation",
+        "soar engineer",
+        "automation engineer",
+        "security engineer automation"
+      ],
+      "cv": "Jane_Applicant_CV_Security_Automation.pdf"
+    },
+    {
+      "title": "Detection Engineer",
+      "keywords": [
+        "detection engineer",
+        "detection engineering",
+        "siem engineer"
+      ],
+      "cv": "Jane_Applicant_CV_Detection_Engineer.pdf"
+    }
+  ],
+  "cv_base_path": "/cvs",
+  "company_seed_list": [
+    {
+      "name": "Example Security Co",
+      "url": "https://example.com",
+      "location": "Springfield"
+    },
+    {
+      "name": "Acme Cyber",
+      "url": "https://acme.example.com",
+      "location": "Shelbyville"
+    }
+  ],
+  "careers_page_patterns": [
+    "/careers",
+    "/jobs",
+    "/en/careers",
+    "/en/jobs",
+    "/about/careers",
+    "/company/careers",
+    "/work-with-us",
+    "/join-us",
+    "/join",
+    "/career",
+    "/he/careers",
+    "/career-opportunities",
+    "/open-positions",
+    "/positions"
+  ],
+  "application_methods": {
+    "preferred_order": [
+      "web_form",
+      "email",
+      "ats"
+    ],
+    "email_subject_template": "Application for {job_title} – {candidate_name}",
+    "ats_systems": [
+      "greenhouse",
+      "lever",
+      "workday",
+      "taleo",
+      "smartrecruiters",
+      "comeet",
+      "jobvite"
+    ]
+  }
+}

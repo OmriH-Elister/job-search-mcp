@@ -1,0 +1,13 @@
+# Personal data — never commit
+config.json
+config.json.bak-*
+config_original.json
+data/
+logs/
+cvs/
+*.log
+.env
+
+# Python
+__pycache__/
+*.pyc
