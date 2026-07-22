@@ -1,19 +1,37 @@
-# career-ops-agent
+# Career Ops Agent
 
-An autonomous job-search pipeline built as an MCP (Model Context Protocol) server.
-It scans company career pages nightly, filters matches against a target profile,
-drafts tailored cover letters, and submits applications — via ATS forms where
-possible, with an email fallback where not. Runs unattended in Docker on a
-Windows Scheduled Task, with toast and email notifications on completion.
+An agentic career-operations system that discovers relevant vacancies, evaluates
+them against a target profile, drafts tailored application materials, and
+coordinates human-approved submissions.
 
-I built this because I'm a security engineer and the job search is, structurally,
-a monitoring-and-response problem: noisy signal sources, a triage step, an
-enrichment step, and an automated response with a human-approval gate. So I
-built it the way I'd build a detection pipeline.
+The project combines:
 
-> **Status:** personal project, actively used in production (on my own career).
-> Sanitized for publication — the seed list, credentials, and personal data
-> are excluded. See [Configuration](#configuration).
+- an AI agent and skill layer that defines goals, decision rules, MCP tool usage,
+  and approval boundaries;
+- an MCP (Model Context Protocol) server that exposes job-search and
+  application-management capabilities to compatible AI clients;
+- a scheduled scanner that monitors company career pages;
+- persistent state for deduplication, application tracking, and interrupted
+  session recovery;
+- a human approval gate before any application is submitted; and
+- ATS automation, an email fallback, and completion notifications for approved
+  applications.
+
+The MCP server is one component of the system, not the entire system.
+Deterministic work such as scheduled scanning and deduplication runs
+automatically, while the AI layer interprets results, drafts application
+materials, and guides the broader workflow. The system is therefore agentic
+rather than fully autonomous: consequential submissions remain subject to
+human approval.
+
+I built this because I'm a security engineer and the job search is,
+structurally, a monitoring-and-response problem: noisy signal sources, a triage
+step, an enrichment step, and an automated response with a human-approval gate.
+I built it the way I'd build a detection-and-response pipeline.
+
+> **Status:** Personal project actively used in my own job search. The published
+> version excludes credentials, personal profile data, application history, and
+> the private company seed list. See [Configuration](#configuration).
 
 ---
 
