@@ -348,11 +348,17 @@ async def submit_application(job_id: str) -> str:
         lines = [
             f"⚠️ ATS failed for {job.get('company', '')} ({result.get('message', '')})",
             "", "📧 EMAIL FALLBACK:",
-            f"  To:        {fb['to_email'] or 'Not found — use constructed:'}",
+            f"  To:        {fb['to_email'] or 'NO ADDRESS FOUND ON SITE'}",
         ]
         if not fb["to_email"] and fb["constructed_emails"]:
+            lines += [
+                "             ⚠️  The addresses below are GUESSES built from the",
+                "                 domain. None was found on the site. Verify one",
+                "                 exists before sending — most companies of this",
+                "                 kind take applications only through their form.",
+            ]
             for addr in fb["constructed_emails"]:
-                lines.append(f"             {addr}")
+                lines.append(f"                 {addr}  (unverified)")
         lines += [
             f"  Subject:   {fb['subject']}",
             f"  CV:        {fb['cv_filename']}",
@@ -395,9 +401,17 @@ async def get_status() -> str:
         f"  Scan progress:             {s['scan_progress']}",
         f"  Pending approval:          {s['pending_approvals']}",
         "",
-        f"📁 Application History:      {s.get('total_historical_applications', 0)} total",
-        f"🌙 Nightly scan pending:     {nightly_pending} letter(s) awaiting review",
+        f"📁 Applications delivered:   {s.get('total_historical_applications', 0)}",
+        f"📇 Company+role pairs known: {s.get('total_historical_tracked', 0)}",
     ]
+
+    undelivered = {k: v for k, v in s.get("historical_by_status", {}).items()
+                   if k != "submitted"}
+    if undelivered:
+        detail = ", ".join(f"{v} {k}" for k, v in sorted(undelivered.items()))
+        lines.append(f"   ↳ not delivered:          {detail}")
+
+    lines.append(f"🌙 Nightly scan pending:     {nightly_pending} letter(s) awaiting review")
     return "\n".join(lines)
 
 

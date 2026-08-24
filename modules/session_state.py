@@ -43,8 +43,24 @@ class ApplicationHistory:
     def get_all(self) -> list[dict]:
         return list(self._applied.values())
 
+    # Statuses that mean an application actually reached the employer.
+    DELIVERED_STATUSES = {"submitted"}
+
     def count(self) -> int:
+        """Applications actually delivered. Drafts and dead ends do not count."""
+        return sum(1 for v in self._applied.values()
+                   if v.get("status") in self.DELIVERED_STATUSES)
+
+    def count_tracked(self) -> int:
+        """Every company+role pair on file, whatever became of it."""
         return len(self._applied)
+
+    def count_by_status(self) -> dict[str, int]:
+        """Breakdown of the history file by status, for reporting."""
+        out: dict[str, int] = {}
+        for v in self._applied.values():
+            out[v.get("status") or "unknown"] = out.get(v.get("status") or "unknown", 0) + 1
+        return out
 
     def save(self):
         try:
@@ -145,4 +161,6 @@ class SessionState:
             "pending_list": pending,
             "submitted_list": submitted,
             "total_historical_applications": self.history.count(),
+            "total_historical_tracked": self.history.count_tracked(),
+            "historical_by_status": self.history.count_by_status(),
         }

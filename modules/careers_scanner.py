@@ -1,7 +1,7 @@
 import logging
 import re
 import asyncio
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, unquote
 from typing import Optional
 from modules.browser_manager import BrowserManager
 
@@ -46,6 +46,23 @@ BLOCKED_PATH_SEGMENTS = {
 # Regex for date-patterned URLs like /cybersecurity-brief-02-07-2020
 DATE_URL_PATTERN = re.compile(r'/[\w-]+-\d{2}-\d{2}-\d{4}')
 
+# ── Index & category pages ────────────────────────────────────────────────────
+# These LIST jobs; they are not jobs. Matching one produces a "job" with no
+# application form behind it, which surfaces later as "Submit button not found".
+CAREERS_INDEX_SEGMENTS = {
+    "careers", "career", "jobs", "job", "positions", "position",
+    "openings", "opening", "open-roles", "open-positions", "vacancies",
+    "hiring", "join", "join-us", "work-with-us", "apply", "all-jobs",
+    "משרות", "דרושים", "קריירה",
+}
+
+CATEGORY_PATH_HINTS = (
+    "/category/", "/categories/", "/tag/", "/tags/",
+    "/department/", "/departments/", "/team/", "/teams/",
+    "/location/", "/locations/", "/browse/", "/search",
+    "/filter", "/job-search", "/all-jobs",
+)
+
 
 class CareersScanner:
     def __init__(self, browser: BrowserManager, target_roles: list[dict]):
@@ -67,6 +84,50 @@ class CareersScanner:
 
         if DATE_URL_PATTERN.search(path):
             return True
+
+        return False
+
+    @staticmethod
+    def _norm_path(url: str) -> str:
+        """Lowercased, percent-decoded path with no trailing slash."""
+        path = unquote(urlparse(url).path).lower()
+        return "/" + "/".join(seg for seg in path.split("/") if seg)
+
+    @classmethod
+    def is_index_url(cls, url: str, careers_url: str = "") -> bool:
+        """
+        True when the URL is a listing page rather than a single posting.
+
+        Catches three shapes:
+          1. a bare careers/jobs root      — /careers, /en/jobs, /משרות
+          2. a category or filter view     — /jobs/category/security, /jobs?dept=
+          3. the careers page itself, or an ancestor of it, linking to itself
+             (trailing-slash variants included, which plain equality misses)
+        """
+        if not url:
+            return True
+
+        path = cls._norm_path(url)
+        segments = [seg for seg in path.split("/") if seg]
+
+        if not segments:
+            return True
+
+        if segments[-1] in CAREERS_INDEX_SEGMENTS:
+            return True
+
+        if any(hint in path + "/" for hint in CATEGORY_PATH_HINTS):
+            return True
+
+        if urlparse(url).query and not any(
+            seg not in CAREERS_INDEX_SEGMENTS for seg in segments
+        ):
+            return True
+
+        if careers_url:
+            careers_path = cls._norm_path(careers_url)
+            if path == careers_path or careers_path.startswith(path + "/"):
+                return True
 
         return False
 
@@ -158,6 +219,10 @@ class CareersScanner:
                     if self.is_blocked_url(full_url):
                         continue
 
+                    if self.is_index_url(full_url, careers_url):
+                        logger.debug("Skipping index/category URL: %s", full_url)
+                        continue
+
                     is_job_link = any(kw in href.lower() for kw in
                         ["/job/", "/jobs/", "/position/", "/opening/", "/apply/",
                          "greenhouse.io", "comeet.com", "lever.co"])
@@ -169,6 +234,7 @@ class CareersScanner:
                             "title": text,
                             "url": full_url,
                             "company": company_name,
+                            "careers_url": careers_url,
                             "description": "",
                             "ats_type": ats,
                             "application_method": f"ats:{ats}" if ats else "web_form",
@@ -196,7 +262,12 @@ class CareersScanner:
         seen_roles = set()  # within-batch dedup: company+role
 
         for job in raw_jobs:
-            if self.is_blocked_url(job.get("url", "")):
+            url = job.get("url", "")
+            if self.is_blocked_url(url):
+                continue
+            if self.is_index_url(url, job.get("careers_url", "")):
+                logger.info("Rejected index/category match: %s (%s)",
+                            job.get("title", ""), url)
                 continue
 
             combined = (job["title"] + " " + job.get("description", "")).lower()
