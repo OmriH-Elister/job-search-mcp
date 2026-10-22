@@ -17,6 +17,25 @@ ARTICLE_TITLE_PATTERNS = [
     r'\b\d{4}\b.*\b(startups|companies)\b',  # "2026 ... companies"
 ]
 
+# Job boards and aggregators list other companies' jobs; they are not employers.
+# A discovered "company" on one of these domains, or named like a listing page
+# ("Cyber Security Jobs in Tel Aviv"), is dropped.
+JOB_BOARD_DOMAINS = {
+    "cyberlist.co", "linkedin.com", "indeed.com", "glassdoor.com", "glassdoor.co.il",
+    "alljobs.co.il", "drushim.co.il", "jobmaster.co.il", "jobnet.co.il", "jobkarov.com",
+    "gotfriends.co.il", "secrettelaviv.com", "builtin.com", "wellfound.com", "angel.co",
+    "startup.jobs", "ziprecruiter.com", "monster.com", "simplyhired.com", "techaviv.com",
+    "geektime.co.il", "finder.startupnationcentral.org", "startupnationcentral.org",
+    "comeet.com", "greenhouse.io", "lever.co", "ashbyhq.com", "myworkdayjobs.com",
+    "cybersecurityjobs.com", "cyberseek.org", "infosec-jobs.com", "remoteok.com",
+    "weworkremotely.com", "dice.com", "jooble.org", "careerjet.co.il", "jobs.co.il",
+}
+JOB_BOARD_NAME_PATTERN = re.compile(
+    r'\b(jobs?|careers?|vacanc(y|ies)|openings|hiring|recruit(ing|ment)?)\b'
+    r'|דרושים|משרות|דרושות',
+    re.IGNORECASE,
+)
+
 # Minimum requirements for a valid company name
 COMPANY_NAME_MIN_LENGTH = 2
 COMPANY_NAME_MAX_LENGTH = 50
@@ -27,6 +46,12 @@ class CompanyFinder:
         self.config = config
         self.seed_list = config.get("company_seed_list", [])
         self.search_areas = config["geography"]["search_areas"]
+        self.excluded = [n.lower().strip() for n in config.get("excluded_companies", [])]
+
+    def is_excluded(self, name: str) -> bool:
+        """True if the company name contains any config.json excluded_companies entry."""
+        name = name.lower().strip()
+        return any(ex in name for ex in self.excluded)
 
     def get_seed_companies(self) -> list[dict]:
         return [
@@ -36,6 +61,8 @@ class CompanyFinder:
                 "location": c["location"],
                 "source": "seed_list",
                 "status": "pending",
+                # Optional per-company overrides (see modules/ats.py)
+                **{k: c[k] for k in ("ats", "careers_url") if k in c},
             }
             for c in self.seed_list
         ]
@@ -85,6 +112,10 @@ class CompanyFinder:
                         url = urls[i] if i < len(urls) else None
                         if url:
                             url = self._clean_url(url)
+
+                        if self._is_job_board(name, url):
+                            logger.info("Skipping job board: %s (%s)", name, url)
+                            continue
 
                         # Extract area from query
                         area = "Israel"
@@ -146,6 +177,16 @@ class CompanyFinder:
             return True
         return False
 
+    def _is_job_board(self, name: str, url: Optional[str]) -> bool:
+        """True for aggregators and listing pages that would pose as employers."""
+        if JOB_BOARD_NAME_PATTERN.search(name or ""):
+            return True
+        if url:
+            domain = urlparse(url).netloc.lower().removeprefix("www.")
+            if any(domain == d or domain.endswith("." + d) for d in JOB_BOARD_DOMAINS):
+                return True
+        return False
+
     def _clean_url(self, url: str) -> Optional[str]:
         """Extract the actual domain URL from a DuckDuckGo redirect."""
         if not url:
@@ -174,6 +215,9 @@ class CompanyFinder:
                 domain_key = urlparse(company["url"]).netloc.lower().replace("www.", "")
 
             if key in seen or (domain_key and domain_key in seen):
+                continue
+            if self.is_excluded(company["name"]):
+                logger.info("Skipping excluded company: %s", company["name"])
                 continue
 
             seen.add(key)

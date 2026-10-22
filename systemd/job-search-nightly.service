@@ -1,0 +1,15 @@
+[Unit]
+Description=Job search nightly careers scan
+# docker.service is absent until docker-ce is installed; After= on a missing
+# unit is a no-op, and run_nightly.sh has its own engine readiness loop anyway.
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Replace YOUR_USER and /path/to/job-search-mcp before installing.
+User=YOUR_USER
+Group=YOUR_USER
+ExecStart=/path/to/job-search-mcp/run_nightly.sh
+# Script allows 3 attempts x 60min timeout, with 5min backoff between them.
+TimeoutStartSec=12000

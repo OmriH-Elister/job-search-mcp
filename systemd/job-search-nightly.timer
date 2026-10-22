@@ -1,0 +1,13 @@
+[Unit]
+Description=Trigger the job search nightly scan at 22:00 local time
+
+[Timer]
+OnCalendar=*-*-* 22:00:00
+# If the machine was asleep or powered off at 22:00, run as soon as it is
+# back rather than silently skipping the night.
+Persistent=true
+AccuracySec=1min
+Unit=job-search-nightly.service
+
+[Install]
+WantedBy=timers.target

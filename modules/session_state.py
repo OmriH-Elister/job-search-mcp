@@ -27,7 +27,8 @@ class ApplicationHistory:
         prefix = f"{company.lower().strip()}::"
         return [v["role"] for k, v in self._applied.items() if k.startswith(prefix)]
 
-    def record(self, company: str, role: str, status: str, job_id: str = "", method: str = ""):
+    def record(self, company: str, role: str, status: str, job_id: str = "", method: str = "",
+               extra: dict | None = None):
         key = self._key(company, role)
         self._applied[key] = {
             "company": company,
@@ -37,7 +38,19 @@ class ApplicationHistory:
             "method": method,
             "timestamp": time.time(),
             "date": time.strftime("%Y-%m-%d %H:%M"),
+            **(extra or {}),
         }
+        self.save()
+
+    def find_by_job_id(self, job_id: str) -> str | None:
+        """History key for a job_id, or None."""
+        for k, v in self._applied.items():
+            if v.get("job_id") == job_id:
+                return k
+        return None
+
+    def update(self, key: str, fields: dict):
+        self._applied[key].update(fields)
         self.save()
 
     def get_all(self) -> list[dict]:

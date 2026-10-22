@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import sys
+import time
 import os
 from pathlib import Path
 
@@ -51,7 +52,8 @@ def _ensure_ready():
         app_manager = ApplicationManager(CONFIG, browser)
     if careers_scanner is None:
         from modules.careers_scanner import CareersScanner
-        careers_scanner = CareersScanner(browser, CONFIG["target_roles"])
+        careers_scanner = CareersScanner(browser, CONFIG["target_roles"],
+                                         CONFIG.get("exclusions"))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -274,7 +276,7 @@ async def review_applications() -> str:
 
 @mcp.tool()
 async def approve_application(job_id: str) -> str:
-    """Approve a specific job application for submission."""
+    """Approve a specific job application and submit it immediately."""
     _ensure_ready()
     if job_id not in app_manager._pending:
         return f"❌ Job ID '{job_id}' not found."
@@ -288,7 +290,8 @@ async def approve_application(job_id: str) -> str:
     )
     _update_pending_file_status(job_id, "approved")
     state.save()
-    return f"✅ Approved: {job.get('matched_role', 'role')} at {job.get('company', 'company')} (ID: {job_id})"
+    approved_msg = f"✅ Approved: {job.get('matched_role', 'role')} at {job.get('company', 'company')} (ID: {job_id})"
+    return f"{approved_msg}\n{await _submit(job_id)}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -314,14 +317,21 @@ async def reject_application(job_id: str, reason: str = "") -> str:
 
 @mcp.tool()
 async def submit_application(job_id: str) -> str:
-    """Submit an approved application. ATS first, email fallback."""
+    """Submit an approved application. ATS first, email fallback.
+
+    Kept as a standalone tool for retries (e.g. after a submit_failed or
+    needs_email status) — approve_application now submits automatically."""
     _ensure_ready()
     if job_id not in app_manager._pending:
         return f"❌ Job ID '{job_id}' not found."
     job = app_manager._pending[job_id]
     if job.get("status") != "approved":
         return f"⚠️ Job '{job_id}' not approved yet."
+    return await _submit(job_id)
 
+
+async def _submit(job_id: str) -> str:
+    job = app_manager._pending[job_id]
     result = await app_manager.submit(job_id)
 
     if result.get("success"):
@@ -339,9 +349,19 @@ async def submit_application(job_id: str) -> str:
     if result.get("method") == "needs_email_fallback":
         fb = result["email_fallback"]
         state.update_application(job_id, {"status": "needs_email"})
+        # Keep the letter and addresses: the pending file entry is removed below,
+        # and this record is the only place they survive until the draft exists.
         state.history.record(
             company=job.get("company", ""), role=job.get("matched_role", ""),
             status="needs_email", job_id=job_id, method="email_fallback",
+            extra={"email_fallback": {
+                "to_email": fb["to_email"],
+                "constructed_emails": fb["constructed_emails"],
+                "subject": fb["subject"],
+                "body": fb["body"],
+                "cv_filename": fb["cv_filename"],
+                "url": job.get("url", ""),
+            }},
         )
         _update_pending_file_status(job_id, "needs_email")
         state.save()
@@ -364,12 +384,58 @@ async def submit_application(job_id: str) -> str:
             f"  CV:        {fb['cv_filename']}",
             f"  CV Path:   {fb['cv_path']}",
             "", "--- Letter Body ---", fb["body"],
+            "", "--- Next step ---",
+            "Create a Gmail draft with the CV attached for the candidate to review, then call",
+            f"mark_drafted(job_id=\"{job_id}\", draft_id=<Gmail draft id>).",
+            f"Once the candidate sends it, call mark_sent(job_id=\"{job_id}\").",
         ]
         return "\n".join(lines)
 
     state.update_application(job_id, {"status": "submit_failed", "error": result.get("message")})
     state.save()
     return f"❌ {job.get('company', '')} — {result.get('message', 'Unknown error')}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Tool 7b: Email fallback tracking (drafted -> submitted)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@mcp.tool()
+async def mark_drafted(job_id: str, draft_id: str = "") -> str:
+    """Record that a Gmail draft exists for an email-fallback application.
+
+    Call right after creating the draft. 'drafted' blocks re-matching but does
+    not count as delivered."""
+    _ensure_ready()
+    key = state.history.find_by_job_id(job_id)
+    if not key:
+        return f"❌ Job ID '{job_id}' not found in history."
+    state.history.update(key, {
+        "status": "drafted", "method": "email_fallback",
+        "draft_id": draft_id, "drafted_date": time.strftime("%Y-%m-%d %H:%M"),
+    })
+    state.update_application(job_id, {"status": "drafted"})
+    _update_pending_file_status(job_id, "drafted")
+    state.save()
+    rec = state.history._applied[key]
+    return f"📝 Drafted: {rec['role']} at {rec['company']} (draft {draft_id or 'id not given'})"
+
+
+@mcp.tool()
+async def mark_sent(job_id: str) -> str:
+    """Record that a drafted email-fallback application was sent."""
+    _ensure_ready()
+    key = state.history.find_by_job_id(job_id)
+    if not key:
+        return f"❌ Job ID '{job_id}' not found in history."
+    state.history.update(key, {
+        "status": "submitted", "method": "email_fallback",
+        "sent_date": time.strftime("%Y-%m-%d %H:%M"),
+    })
+    state.update_application(job_id, {"status": "submitted"})
+    state.save()
+    rec = state.history._applied[key]
+    return f"✅ Sent: {rec['role']} at {rec['company']}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -494,7 +560,7 @@ def _update_pending_file_status(job_id: str, new_status: str):
     try:
         items = json.loads(PENDING_FILE.read_text())
         updated = [i for i in items
-                   if not (i["job_id"] == job_id and new_status in ("rejected", "submitted", "needs_email"))]
+                   if not (i["job_id"] == job_id and new_status in ("rejected", "submitted", "needs_email", "drafted"))]
         PENDING_FILE.write_text(json.dumps(updated, indent=2, ensure_ascii=False))
     except Exception as e:
         logger.warning("Pending file update failed: %s", e)

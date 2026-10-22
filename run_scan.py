@@ -74,7 +74,8 @@ async def run_scan():
     await browser.init()
 
     company_finder = CompanyFinder(config)
-    careers_scanner = CareersScanner(browser, config["target_roles"])
+    careers_scanner = CareersScanner(browser, config["target_roles"],
+                                     config.get("exclusions"))
     app_manager = ApplicationManager(config, browser)
 
     # ── Lateral move filter ──
@@ -113,11 +114,14 @@ async def run_scan():
             logger.info("  Scanning %d/%d: %s", companies_scanned, len(companies), company_name)
 
             try:
-                # Find careers page
-                careers_url = await asyncio.wait_for(
-                    careers_scanner.find_careers_url(company),
-                    timeout=30
-                )
+                # Find careers page (a pinned ATS needs no page at all)
+                if company.get("ats"):
+                    careers_url = company.get("careers_url") or company.get("url")
+                else:
+                    careers_url = await asyncio.wait_for(
+                        careers_scanner.find_careers_url(company),
+                        timeout=30
+                    )
                 if not careers_url:
                     continue
 
@@ -126,12 +130,13 @@ async def run_scan():
 
                 # Extract job links
                 raw_jobs = await asyncio.wait_for(
-                    careers_scanner.find_job_links(careers_url, company_name),
-                    timeout=30
+                    careers_scanner.find_job_links(careers_url, company_name, company),
+                    timeout=45
                 )
 
-                # Fallback to text extraction
-                if not raw_jobs:
+                # Fallback to text extraction. Not for ATS-backed pages: an empty
+                # feed means no local postings, and the page text is only noise.
+                if not raw_jobs and not careers_scanner.last_ats:
                     page = await browser.new_page()
                     try:
                         if await browser.navigate(page, careers_url):

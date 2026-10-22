@@ -48,7 +48,12 @@
     {
       "name": "Acme Cyber",
       "url": "https://acme.example.com",
-      "location": "Shelbyville"
+      "location": "Shelbyville",
+      "ats": {
+        "_comment": "Optional: pin a known ATS so postings come from its JSON feed (see modules/ats.py for supported types and their fields).",
+        "type": "greenhouse",
+        "slug": "acmecyber"
+      }
     }
   ],
   "careers_page_patterns": [
@@ -83,5 +88,73 @@
       "comeet",
       "jobvite"
     ]
+  },
+  "excluded_companies": [
+    "Former Employer Inc"
+  ],
+  "exclusions": {
+    "_comment": "Titles matching these are dropped before role matching. target_roles says what you want; this says what is out of reach (too senior) or a step backwards (too junior). override_titles re-admits exact titles.",
+    "seniority_terms": [
+      "senior",
+      "sr",
+      "staff",
+      "principal",
+      "lead",
+      "team lead",
+      "teamlead",
+      "expert",
+      "head",
+      "director",
+      "vp",
+      "vice president",
+      "chief",
+      "cto",
+      "ciso",
+      "cio",
+      "manager",
+      "architect",
+      "בכיר",
+      "בכירה",
+      "ראש צוות",
+      "מומחה",
+      "מומחית",
+      "ארכיטקט",
+      "סמנכ\"ל"
+    ],
+    "lateral_terms": [
+      "helpdesk",
+      "help desk",
+      "service desk",
+      "servicedesk",
+      "support representative",
+      "support specialist",
+      "technical support",
+      "desktop support",
+      "it support",
+      "first line support",
+      "1st line support",
+      "tier 1 support",
+      "tier 1 helpdesk",
+      "support tier 1",
+      "תמיכה טכנית",
+      "מוקד תמיכה",
+      "נציג תמיכה",
+      "תומך טכני",
+      "intern",
+      "internship",
+      "student",
+      "סטודנט",
+      "סטודנטית",
+      "רפרנט",
+      "רפרנטית"
+    ],
+    "override_titles": []
+  },
+  "remote": {
+    "_comment": "LinkedIn queue: also look for remote jobs open to your country. Descriptions limiting applicants to other countries are dropped.",
+    "enabled": false,
+    "search_location": "Israel",
+    "max_in_queue": 3,
+    "check_description": true
   }
 }

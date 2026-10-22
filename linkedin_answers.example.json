@@ -1,0 +1,321 @@
+{
+  "_comment": "Answer bank for /linkedin-apply. Copy to data/linkedin_answers.json and fill in your own answers. A screening question is answered only if it matches an entry here with a non-empty answer; anything else skips the job. 'patterns' are case-insensitive regexes matched against the question text. Add entries freely, and add 'per_role' (role title -> answer) to vary an answer by target role.",
+  "answers": [
+    {
+      "id": "years_security",
+      "patterns": [
+        "years?.*(cyber|security|infosec)",
+        "(cyber|security).*years"
+      ],
+      "answer": "",
+      "per_role": {
+        "Detection Engineer": ""
+      }
+    },
+    {
+      "id": "years_soc",
+      "patterns": [
+        "years?.*(soc|siem|security operations)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_noc",
+      "patterns": [
+        "years?.*(noc|network operations|monitoring)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_sysadmin",
+      "patterns": [
+        "years?.*(system admin|sysadmin|it operations|windows server)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_linux",
+      "patterns": [
+        "years?.*linux"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_networking",
+      "patterns": [
+        "years?.*(network|tcp/ip|routing|switching|firewall)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_pentest",
+      "patterns": [
+        "years?.*(penetration|pentest|offensive|red team)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_scripting",
+      "patterns": [
+        "years?.*(python|powershell|bash|scripting)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_total",
+      "patterns": [
+        "how many years.*(experience|work)",
+        "total years"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "cert_ceh",
+      "patterns": [
+        "\\bceh\\b",
+        "certified ethical hacker"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "cert_ccna",
+      "patterns": [
+        "\\bccna\\b"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "cert_security_plus",
+      "patterns": [
+        "security\\+",
+        "security plus",
+        "comptia"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "degree",
+      "patterns": [
+        "bachelor",
+        "degree",
+        "b\\.?sc",
+        "תואר"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "hebrew",
+      "patterns": [
+        "hebrew",
+        "עברית"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "english",
+      "patterns": [
+        "english",
+        "אנגלית"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "salary",
+      "patterns": [
+        "salary",
+        "compensation",
+        "expected pay",
+        "שכר"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "notice_period",
+      "patterns": [
+        "notice period",
+        "start date",
+        "when can you start",
+        "available to start"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "work_authorization",
+      "patterns": [
+        "authori[sz]ed to work",
+        "work permit",
+        "citizen",
+        "visa"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "relocate_commute",
+      "patterns": [
+        "relocat",
+        "commut",
+        "on-?site",
+        "hybrid",
+        "office"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "shifts",
+      "patterns": [
+        "shift",
+        "night",
+        "weekend",
+        "24/7",
+        "משמרות"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "security_clearance",
+      "patterns": [
+        "clearance",
+        "סיווג"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "military_service",
+      "patterns": [
+        "military",
+        "idf",
+        "army",
+        "צבא",
+        "8200"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "driving_license",
+      "patterns": [
+        "driv(ing|er'?s) licen",
+        "רישיון נהיגה",
+        "\\bcar\\b"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "phone",
+      "patterns": [
+        "phone",
+        "mobile",
+        "טלפון"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "email",
+      "patterns": [
+        "e-?mail"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "linkedin_url",
+      "patterns": [
+        "linkedin (profile|url)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "website",
+      "patterns": [
+        "website",
+        "portfolio",
+        "github",
+        "blog"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_python",
+      "patterns": [
+        "years?.*python"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_sql",
+      "patterns": [
+        "years?.*\\bsql\\b"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_os",
+      "patterns": [
+        "years?.*operating system"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_windows",
+      "patterns": [
+        "years?.*windows"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_helpdesk",
+      "patterns": [
+        "years?.*(help ?desk|desktop support)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "exp_cloud",
+      "patterns": [
+        "^(?!.*\\byears?\\b)(do you have|have you).*(cloud|\\baws\\b|azure|gcp)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "exp_siem",
+      "patterns": [
+        "^(?!.*\\byears?\\b)(do you have|have you).*siem"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "exp_code",
+      "patterns": [
+        "^(?!.*\\byears?\\b)(do you have|have you).*(writing code|automation script)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_cloud",
+      "patterns": [
+        "years?.*(cloud|\\baws\\b|azure|gcp)"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_firewall",
+      "patterns": [
+        "years?.*firewall"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "years_network_troubleshooting",
+      "patterns": [
+        "years?.*network troubleshoot"
+      ],
+      "answer": ""
+    },
+    {
+      "id": "onsite_comfortable",
+      "patterns": [
+        "comfortable.*on-?site",
+        "on-?site setting"
+      ],
+      "answer": ""
+    }
+  ]
+}

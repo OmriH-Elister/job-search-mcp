@@ -4,6 +4,7 @@ import asyncio
 from urllib.parse import urljoin, urlparse, unquote
 from typing import Optional
 from modules.browser_manager import BrowserManager
+from modules import ats as ats_feeds
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,41 @@ CATEGORY_PATH_HINTS = (
 
 
 class CareersScanner:
-    def __init__(self, browser: BrowserManager, target_roles: list[dict]):
+    def __init__(self, browser: BrowserManager, target_roles: list[dict],
+                 exclusions: Optional[dict] = None):
         self.browser = browser
         self.target_roles = target_roles
+
+        exclusions = exclusions or {}
+        self.exclude_terms: list[str] = (
+            list(exclusions.get("seniority_terms", []))
+            + list(exclusions.get("lateral_terms", []))
+        )
+        self.override_titles = {t.lower().strip()
+                                for t in exclusions.get("override_titles", [])}
+        self.last_ats = None    # ATS type behind the last find_job_links call
+
+    # ── Seniority / level filtering ────────────────────────────────────────
+
+    def out_of_reach(self, title: str) -> Optional[str]:
+        """
+        Return the term that puts this title out of range, or None.
+
+        target_roles describes the work wanted; this describes the levels that
+        are not a fit — above (Senior/Staff/Lead/Expert) or below (tier 1,
+        helpdesk, intern). Keyword matching alone cannot separate them: every
+        'Senior X Expert' contains 'X' and matches on it.
+        """
+        if not title:
+            return None
+        if title.lower().strip() in self.override_titles:
+            return None
+        for term in self.exclude_terms:
+            # \w covers Hebrew under Python's Unicode rules, so the same
+            # boundary check works for both scripts.
+            if re.search(rf"(?<!\w){re.escape(term)}(?!\w)", title, re.IGNORECASE):
+                return term
+        return None
 
     # ── URL classification ─────────────────────────────────────────────────
 
@@ -192,13 +225,40 @@ class CareersScanner:
 
     # ── Extract job links ──────────────────────────────────────────────────
 
-    async def find_job_links(self, careers_url: str, company_name: str) -> list[dict]:
-        """Extract individual job posting links from a careers page."""
+    async def find_job_links(self, careers_url: str, company_name: str,
+                             company: Optional[dict] = None) -> list[dict]:
+        """
+        Extract individual job posting links from a careers page.
+
+        When the page is backed by a known ATS (or the seed entry pins one),
+        postings come from the ATS's JSON feed instead of the page's links.
+        self.last_ats records which, so callers can skip text-scraping fallbacks.
+        """
+        self.last_ats = None
+        pinned = (company or {}).get("ats")
+        if pinned:
+            jobs = await ats_feeds.fetch_jobs(pinned, company_name, careers_url)
+            if jobs is not None:
+                self.last_ats = pinned.get("type")
+                return jobs
+
         page = await self.browser.new_page()
         jobs = []
         try:
             if not await self.browser.navigate(page, careers_url):
                 return jobs
+
+            if not pinned:
+                try:
+                    html = await asyncio.wait_for(page.content(), timeout=10)
+                except Exception:
+                    html = ""
+                detected = ats_feeds.detect(html, page.url or careers_url)
+                if detected:
+                    feed = await ats_feeds.fetch_jobs(detected, company_name, careers_url)
+                    if feed is not None:
+                        self.last_ats = detected["type"]
+                        return feed
 
             links = await page.query_selector_all("a[href]")
             seen_hrefs = set()
@@ -259,7 +319,8 @@ class CareersScanner:
 
     def match_jobs(self, raw_jobs: list[dict]) -> list[dict]:
         matched = []
-        seen_roles = set()  # within-batch dedup: company+role
+        seen_roles = set()          # within-batch dedup: company+role
+        skipped_on_level = []       # reported at the end — never silently dropped
 
         for job in raw_jobs:
             url = job.get("url", "")
@@ -268,6 +329,14 @@ class CareersScanner:
             if self.is_index_url(url, job.get("careers_url", "")):
                 logger.info("Rejected index/category match: %s (%s)",
                             job.get("title", ""), url)
+                continue
+
+            level_block = self.out_of_reach(job.get("title", ""))
+            if level_block:
+                logger.info("Rejected on level ('%s'): %s — %s",
+                            level_block, job.get("company", ""), job.get("title", ""))
+                skipped_on_level.append((job.get("company", ""),
+                                         job.get("title", ""), level_block))
                 continue
 
             combined = (job["title"] + " " + job.get("description", "")).lower()
@@ -286,6 +355,13 @@ class CareersScanner:
                         "cv_file": role["cv"],
                     })
                     break
+
+        if skipped_on_level:
+            logger.info("Level filter dropped %d posting(s): %s",
+                        len(skipped_on_level),
+                        "; ".join(f"{c} — {t} [{term}]"
+                                  for c, t, term in skipped_on_level))
+        self.last_skipped_on_level = skipped_on_level
         return matched
 
     # ── Find HR email ──────────────────────────────────────────────────────

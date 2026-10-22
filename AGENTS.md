@@ -34,8 +34,38 @@ For each genuinely new match:
 3. Pause ONLY for letter confirmation
 
 Do NOT ask "want me to approve these?" and do NOT list matches separately from
-their letters. Once a letter is confirmed, submit immediately (ATS, falling
-back to email).
+their letters. Once a letter is confirmed, submit immediately:
+`approve_application` submits on approval (ATS, falling back to email).
+
+**Level filter:** before role matching, titles containing a
+`config.json` `exclusions` term (too senior, or helpdesk/intern-level) are
+dropped and listed in the scan log. `override_titles` re-admits exact titles.
+
+---
+
+## Email fallback
+
+When ATS submission fails, the server prints the recipient, subject, letter
+and CV path, and records the job as `needs_email` with those details kept in
+`data/previously_applied.json`. The server cannot reach Gmail itself, so the
+agent session does the rest:
+
+1. Create a Gmail draft with the CV attached for the candidate to review.
+2. Call `mark_drafted(job_id, draft_id)` → status `drafted`. Drafted jobs
+   block re-matching but do not count as delivered.
+3. Once the candidate sends it, call `mark_sent(job_id)` → status `submitted`.
+
+---
+
+## LinkedIn Easy Apply queue
+
+The nightly run calls `linkedin_queue.py build`, which uses LinkedIn's public
+(logged-out) job search to queue up to 10 matching Easy Apply jobs. Nothing
+is submitted. The `/linkedin-apply` command (`claude/commands/`) reviews the
+queue with the candidate and submits approved jobs through Claude in Chrome,
+answering screening questions only from `data/linkedin_answers.json` (see
+`linkedin_answers.example.json`). Unmatched questions skip the job; answers
+are never invented.
 
 **Zero-match runs:** if a full scan yields no genuinely new matches after
 filtering, automatically research and add 5 new relevant companies to
@@ -61,8 +91,10 @@ lists). Never apply to an excluded company, even on a strong match.
 | Image | `job-search-mcp:latest` |
 | Data volume | `<root>\data` -> `/data` (nightly AND MCP server must share this) |
 | CV volume | `JOB_SEARCH_CV_DIR` env var -> `/cvs:ro` (defaults to `<root>\cvs`) |
-| Scheduled task | `JobSearchNightlyScan`, daily 22:00 |
-| Wrapper | `run_nightly.ps1` |
+| Scheduled task | Windows: `JobSearchNightlyScan`, daily 22:00. Linux: `systemd/job-search-nightly.timer` (or cron) |
+| Wrapper | `run_nightly.ps1` (Windows) / `run_nightly.sh` (Linux) |
+| MCP launcher | `mcp_launch.sh` (Linux; loads `.env.nightly`) |
+| ATS feeds | `modules/ats.py` — detected from the careers page or pinned per company with an `ats` block |
 | Seed list | `company_seed_list` in `config.json` |
 
 ### SMTP
@@ -78,6 +110,11 @@ Credentials are never stored in files.
   `UTF8Encoding($false)`.
 - Em dash / unicode corruption in generated files. Prefer ASCII in scripts.
 - Session resume: `initialize_session(resume=true)`.
+- The MCP server holds `previously_applied.json` in memory and rewrites the
+  whole file on every update. After editing it by hand, restart/reconnect the
+  server before using any tool that writes, or the edit is lost.
+- Code is baked into the Docker image (only `data/`, `config.json` and the CV
+  directory are mounted). Rebuild the image after code changes.
 - Task Scheduler may not inherit env vars — wrapper loads them explicitly.
 
 ### Config hygiene

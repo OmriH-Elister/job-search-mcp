@@ -39,17 +39,22 @@ I built it the way I'd build a detection-and-response pipeline.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Windows Task Scheduler (nightly)                       │
+│  Task Scheduler (Windows) / systemd timer (Linux)       │
 │      └─► Docker readiness check ─► container start      │
 ├─────────────────────────────────────────────────────────┤
-│  Scan stage      career-page fetchers (per-company)     │
-│  Filter stage    dedupe · already-applied · lateral-    │
-│                  move rules · false-positive URL rules  │
+│  Scan stage      ATS JSON feeds (Greenhouse, Lever,     │
+│                  Ashby, Comeet, Workday) · page scrape  │
+│                  fallback · LinkedIn Easy Apply queue   │
+│  Filter stage    dedupe · already-applied · seniority / │
+│                  lateral-move rules · job-board and     │
+│                  false-positive URL rules               │
 │  Draft stage     cover-letter generation from profile + │
 │                  job description                        │
 │  Approval gate   letters surface for human confirmation │
 │                  (MCP session, resume-capable)          │
-│  Submit stage    ATS form automation ─► Gmail fallback  │
+│  Submit stage    ATS form automation ─► Gmail draft     │
+│                  fallback (needs_email → drafted →      │
+│                  submitted)                             │
 │  Notify stage    Windows toast + email summary          │
 ├─────────────────────────────────────────────────────────┤
 │  Shared data volume (single mount, scanner + MCP server)│
@@ -69,6 +74,16 @@ Design decisions worth calling out:
   after filtering triggers a research step that adds five new target companies
   to the seed list before the run ends. The pipeline treats "no findings" as a
   coverage gap, not a success state.
+- **Feeds over scraping.** Most careers pages render listings with JavaScript
+  or an embedded ATS widget, so scraping `<a>` tags finds section headings,
+  not postings. `modules/ats.py` spots the ATS behind a page and reads the
+  same postings from the vendor's JSON API; a seed entry can pin the ATS when
+  detection misses.
+- **Drafts are tracked, not assumed.** When ATS submission fails, the letter
+  and addresses are kept in the history file and the agent creates a Gmail
+  draft for review. `mark_drafted` and `mark_sent` move the job through
+  `needs_email → drafted → submitted`, so an unsent draft never counts as an
+  application, and a sent one never sits in limbo.
 - **Session resume.** Long-running MCP sessions survive interruption via an
   `initialize_session` / `resume: true` handshake, so a nightly run that dies
   mid-approval can be picked up without re-scanning.
@@ -104,9 +119,12 @@ README usually hides and an engineer actually wants to read:
   letters, triggering submissions. Something like Docker's MCP gateway works
   too; the server itself is plain stdio, so any launcher that can run
   `docker run -i` can host it.
-- **Windows** for the nightly automation as shipped (PowerShell wrapper,
-  Task Scheduler, toast notifications). The Python core is OS-agnostic —
-  porting the wrapper to cron/systemd is a small exercise.
+- **Windows or Linux** for the nightly automation. Windows: PowerShell
+  wrapper, Task Scheduler, toast notifications. Linux: `run_nightly.sh` with
+  the units in `systemd/` (or cron), plus `mcp_launch.sh` to start the MCP
+  server with SMTP credentials from `.env.nightly`.
+- **Optional: Claude in Chrome** for `/linkedin-apply`, which submits the
+  queued LinkedIn Easy Apply jobs you approve (see `claude/commands/`).
 
 ## Registering the MCP server
 
@@ -166,15 +184,28 @@ way, then:
 3. `docker build -t job-search-mcp .`, register the MCP server with your
    client, and run `setup_scheduled_task.ps1` once as Administrator to
    create the nightly task.
+   On Linux instead: put the SMTP variables in `.env.nightly` (see
+   `.env.nightly.example`), edit the user and path in `systemd/*.service`,
+   copy both units to `/etc/systemd/system/`, and run
+   `sudo systemctl enable --now job-search-nightly.timer`.
+4. Optional, for `/linkedin-apply`: copy `linkedin_answers.example.json` to
+   `data/linkedin_answers.json` and fill in your own answers, and copy
+   `claude/commands/linkedin-apply.md` to `~/.claude/commands/`.
 
 The agent's operating rules — triage behavior, the approval gate, the
 zero-match seed-expansion rule — live in `CLAUDE.md` / `AGENTS.md`.
 
 ## Roadmap
 
+Done since the first release: ATS JSON feeds (Greenhouse, Lever, Ashby,
+Comeet, Workday), a seniority/lateral-move title filter, job-board
+filtering in company discovery, Linux scheduling via systemd, the LinkedIn
+Easy Apply queue, and tracked Gmail-draft fallback.
+
+Next:
+
 - Response/funnel tracking: tag every reply, interview, and offer by channel
   so the pipeline measures conversion, not just throughput
-- Pluggable fetchers for common ATS platforms (Comeet, Greenhouse, Lever)
 - Structured detection-style rules for match filtering, replacing ad-hoc logic
 
 ## Why this is on my CV
