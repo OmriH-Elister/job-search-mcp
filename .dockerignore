@@ -1,0 +1,38 @@
+# Keep secrets and personal data out of the image. data/, config.json and the
+# CV directory are bind-mounted at runtime (run_nightly.sh, mcp_launch.sh), so
+# the image never needs its own copies. Docker does not read .gitignore.
+
+# Secrets and personal data
+.env
+.env.*
+config.json
+config.json.*
+config_original.json
+data/
+cvs/
+logs/
+*.zip
+
+# Backups, logs, caches
+**/*.bak
+**/*.bak-*
+**/*.log
+**/__pycache__/
+**/*.pyc
+
+# Host-side tooling the container never runs
+.git/
+.claude/
+claude/
+scheduler/
+systemd/
+linkedin_queue.py
+linkedin_answers.example.json
+setup_config.py
+mcp_launch.sh
+run_nightly.sh
+run_nightly.ps1
+setup_scheduled_task.ps1
+config.example.json
+LICENSE
+*.md
